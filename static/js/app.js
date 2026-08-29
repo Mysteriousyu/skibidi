@@ -1,24 +1,20 @@
-// ---- State ----
 let chats = JSON.parse(localStorage.getItem('omnillm_chats') || '[]');
 let currentChatId = null;
 let pendingFiles = [];
 let isStreaming = false;
 let PROVIDERS = {};
 
-// ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     const res = await fetch('/api/providers');
     PROVIDERS = await res.json();
-  } catch(e) {
-    console.error('Failed to load providers', e);
-  }
+  } catch(e) { console.error(e); }
   buildProviderSelect();
   renderChatList();
   if (chats.length) loadChat(chats[0].id);
 });
 
-// ---- Provider Select (no model choice) ----
+// ---- Provider + Model ----
 function buildProviderSelect() {
   const sel = document.getElementById('providerSelect');
   sel.innerHTML = '';
@@ -35,22 +31,33 @@ function buildProviderSelect() {
 }
 
 function onProviderChange() {
+  const provider = document.getElementById('providerSelect').value;
+  const config = PROVIDERS[provider];
+  const mSel = document.getElementById('modelSelect');
+  mSel.innerHTML = '';
+  if (config && config.models) {
+    for (const m of config.models) {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      mSel.appendChild(opt);
+    }
+  }
   updateStatus();
 }
 
 function updateStatus() {
   const provider = document.getElementById('providerSelect').value;
   const hasKey = !!localStorage.getItem(`key_${provider}`);
-  const config = PROVIDERS[provider];
   const el = document.getElementById('headerStatus');
-  if (hasKey && config) {
-    el.innerHTML = `<span style="color:var(--green)">● ${config.default_model}</span>`;
+  if (hasKey) {
+    el.innerHTML = '<span style="color:var(--green)">● Connected</span>';
   } else {
-    el.innerHTML = `<span style="color:var(--text-muted)">● No API key — <a href="#" onclick="openSettings();return false" style="color:var(--accent)">add one</a></span>`;
+    el.innerHTML = '<span style="color:var(--text-muted)">● No key — <a href="#" onclick="openSettings();return false" style="color:var(--accent)">add one</a></span>';
   }
 }
 
-// ---- Chat Management ----
+// ---- Chats ----
 function newChat() {
   const chat = { id: crypto.randomUUID(), title: 'New chat', messages: [], created: Date.now() };
   chats.unshift(chat);
@@ -59,14 +66,12 @@ function newChat() {
   renderChatList();
   document.getElementById('messageInput').focus();
 }
-
 function loadChat(id) {
   currentChatId = id;
   renderChatList();
   const chat = chats.find(c => c.id === id);
   if (chat) renderMessages(chat.messages);
 }
-
 function deleteChat(id, e) {
   e.stopPropagation();
   chats = chats.filter(c => c.id !== id);
@@ -74,11 +79,9 @@ function deleteChat(id, e) {
   if (currentChatId === id) { currentChatId = null; showWelcome(); }
   renderChatList();
 }
-
 function saveChats() {
   try { localStorage.setItem('omnillm_chats', JSON.stringify(chats)); } catch(e) {}
 }
-
 function showWelcome() {
   document.getElementById('chatMessages').innerHTML = `
     <div class="welcome">
@@ -86,14 +89,13 @@ function showWelcome() {
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8" stroke-linecap="round"/></svg>
       </div>
       <h2>OmniLLM</h2>
-      <p>One interface, seven AI providers. Add your API key and start chatting.</p>
+      <p>Pick a provider, choose a model, paste your API key, and chat.</p>
       <div class="welcome-grid">
         <div class="welcome-card" onclick="openSettings()"><span class="wc-icon">🔑</span><span>Set up API keys</span></div>
         <div class="welcome-card" onclick="openTerminal()"><span class="wc-icon">⌨️</span><span>Code terminal</span></div>
       </div>
     </div>`;
 }
-
 function renderChatList() {
   document.getElementById('chatList').innerHTML = chats.map(c => `
     <div class="chat-item ${c.id === currentChatId ? 'active' : ''}" onclick="loadChat('${c.id}')">
@@ -109,7 +111,6 @@ function renderMessages(messages) {
   el.innerHTML = messages.map(renderMsg).join('');
   el.scrollTop = el.scrollHeight;
 }
-
 function renderMsg(msg) {
   const isUser = msg.role === 'user';
   let filesHtml = '';
@@ -130,7 +131,6 @@ function renderMsg(msg) {
       </div>
     </div>`;
 }
-
 function fmtMd(t) {
   if (!t) return '';
   t = t.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
@@ -140,7 +140,6 @@ function fmtMd(t) {
   t = t.split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
   return t;
 }
-
 function esc(s) {
   if (!s) return '';
   const d = document.createElement('div');
@@ -148,12 +147,11 @@ function esc(s) {
   return d.innerHTML;
 }
 
-// ---- File Handling ----
+// ---- Files ----
 function handleFiles(fileList) {
   for (const f of fileList) uploadFile(f);
   document.getElementById('fileInput').value = '';
 }
-
 async function uploadFile(file) {
   const form = new FormData();
   form.append('file', file);
@@ -165,7 +163,6 @@ async function uploadFile(file) {
     renderFilePreview();
   } catch(e) { alert('Upload failed: ' + e.message); }
 }
-
 function renderFilePreview() {
   const bar = document.getElementById('filePreviewBar');
   if (!pendingFiles.length) { bar.classList.add('hidden'); return; }
@@ -177,19 +174,19 @@ function renderFilePreview() {
       <button class="remove-file" onclick="removePendingFile(${i})">×</button>
     </div>`).join('');
 }
-
 function removePendingFile(i) {
   pendingFiles.splice(i, 1);
   renderFilePreview();
 }
 
-// ---- Send Message ----
+// ---- Send ----
 async function sendMessage() {
   const input = document.getElementById('messageInput');
   const text = input.value.trim();
   if ((!text && !pendingFiles.length) || isStreaming) return;
 
   const provider = document.getElementById('providerSelect').value;
+  const model = document.getElementById('modelSelect').value;
   const apiKey = localStorage.getItem(`key_${provider}`);
   if (!apiKey) { openSettings(); return; }
 
@@ -210,16 +207,13 @@ async function sendMessage() {
   saveChats();
   renderChatList();
 
-  // Typing indicator
   const chatEl = document.getElementById('chatMessages');
   const typing = document.createElement('div');
   typing.className = 'msg assistant';
-  typing.id = 'typingIndicator';
-  const config = PROVIDERS[provider];
   typing.innerHTML = `
     <div class="msg-avatar">AI</div>
     <div class="msg-body">
-      <div class="msg-name">${esc(config?.name || provider)}</div>
+      <div class="msg-name">${esc(model)}</div>
       <div class="msg-content"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>
     </div>`;
   chatEl.appendChild(typing);
@@ -228,26 +222,24 @@ async function sendMessage() {
   isStreaming = true;
   document.getElementById('sendBtn').disabled = true;
 
-  // Build clean message array for API
   const apiMsgs = chat.messages.map(m => ({ role: m.role, content: m.content || '' }));
 
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, api_key: apiKey, messages: apiMsgs })
+      body: JSON.stringify({ provider, api_key: apiKey, model, messages: apiMsgs })
     });
     const data = await res.json();
     typing.remove();
-
     if (data.error) {
-      chat.messages.push({ role: 'assistant', content: '⚠️ ' + data.error, model: config?.name });
+      chat.messages.push({ role: 'assistant', content: '⚠️ ' + data.error, model });
     } else {
-      chat.messages.push({ role: 'assistant', content: data.content, model: data.model || config?.default_model });
+      chat.messages.push({ role: 'assistant', content: data.content, model: data.model || model });
     }
   } catch(e) {
     typing.remove();
-    chat.messages.push({ role: 'assistant', content: '⚠️ Network error: ' + e.message, model: config?.name });
+    chat.messages.push({ role: 'assistant', content: '⚠️ Network error: ' + e.message, model });
   } finally {
     isStreaming = false;
     document.getElementById('sendBtn').disabled = false;
@@ -272,7 +264,7 @@ function openSettings() {
     const val = localStorage.getItem(`key_${key}`) || '';
     return `
       <div class="key-group">
-        <label><span class="key-status ${val ? 'set' : 'unset'}"></span>${p.name}<span class="key-model">${p.default_model}</span></label>
+        <label><span class="key-status ${val ? 'set' : 'unset'}"></span>${p.name}</label>
         <input type="password" id="keyInput_${key}" value="${val}" placeholder="Paste your ${p.name} API key">
       </div>`;
   }).join('');
@@ -317,5 +309,4 @@ function clearOutput() {
   o.className = '';
 }
 
-// ---- Sidebar ----
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }

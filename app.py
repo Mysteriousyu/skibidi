@@ -19,43 +19,43 @@ PROVIDERS = {
     "chatgpt": {
         "name": "ChatGPT",
         "base_url": "https://api.openai.com/v1/chat/completions",
-        "default_model": "gpt-4o",
+        "models": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo", "o1", "o1-mini", "o3-mini"],
         "format": "openai"
     },
     "claude": {
         "name": "Claude",
         "base_url": "https://api.anthropic.com/v1/messages",
-        "default_model": "claude-sonnet-4-20250514",
+        "models": ["claude-sonnet-4-20250514", "claude-haiku-4-20250414", "claude-opus-4-20250514"],
         "format": "anthropic"
     },
     "gemini": {
         "name": "Gemini",
         "base_url": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        "default_model": "gemini-2.0-flash",
+        "models": ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash"],
         "format": "gemini"
     },
     "grok": {
         "name": "Grok",
         "base_url": "https://api.x.ai/v1/chat/completions",
-        "default_model": "grok-3",
+        "models": ["grok-3", "grok-3-mini", "grok-2", "grok-2-mini"],
         "format": "openai"
     },
     "qwen": {
         "name": "Qwen",
         "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
-        "default_model": "qwen-max",
+        "models": ["qwen-max", "qwen-plus", "qwen-turbo", "qwen-long"],
         "format": "openai"
     },
     "nvidia": {
         "name": "NVIDIA",
         "base_url": "https://integrate.api.nvidia.com/v1/chat/completions",
-        "default_model": "meta/llama-3.3-70b-instruct",
+        "models": ["meta/llama-3.3-70b-instruct", "nvidia/llama-3.1-nemotron-ultra-253b-v1", "deepseek/deepseek-r1", "google/gemma-2-27b-it"],
         "format": "openai"
     },
     "kimi": {
         "name": "Kimi",
         "base_url": "https://api.moonshot.cn/v1/chat/completions",
-        "default_model": "moonshot-v1-128k",
+        "models": ["moonshot-v1-128k", "moonshot-v1-32k", "moonshot-v1-8k"],
         "format": "openai"
     }
 }
@@ -109,16 +109,16 @@ def chat():
     data = request.json
     provider = data.get('provider')
     api_key = data.get('api_key')
+    model = data.get('model')
     messages = data.get('messages', [])
 
-    if not provider or not api_key:
-        return jsonify({"error": "Missing provider or api_key"}), 400
+    if not provider or not api_key or not model:
+        return jsonify({"error": "Missing provider, api_key, or model"}), 400
 
     config = PROVIDERS.get(provider)
     if not config:
         return jsonify({"error": f"Unknown provider: {provider}"}), 400
 
-    model = config['default_model']
     ctx = ssl.create_default_context()
 
     try:
@@ -196,7 +196,7 @@ def chat():
             msg = err_json.get('error', {}).get('message', body[:300])
         except:
             msg = body[:300]
-        return jsonify({"error": f"{config['name']} API error ({e.code}): {msg}"}), 502
+        return jsonify({"error": f"{config['name']} error ({e.code}): {msg}"}), 502
     except Exception as e:
         return jsonify({"error": f"Connection error: {str(e)}"}), 500
 
