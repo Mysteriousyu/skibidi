@@ -5,14 +5,27 @@ let isStreaming = false;
 let PROVIDERS = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    const res = await fetch('/api/providers');
-    PROVIDERS = await res.json();
-  } catch(e) { console.error(e); }
+  await loadProviders();
   buildProviderSelect();
   renderChatList();
   if (chats.length) loadChat(chats[0].id);
 });
+
+async function loadProviders(retries = 2) {
+  try {
+    const res = await fetch('/api/providers');
+    if (!res.ok) throw new Error('bad status ' + res.status);
+    PROVIDERS = await res.json();
+  } catch(e) {
+    console.error('Failed to load providers', e);
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 500));
+      return loadProviders(retries - 1);
+    }
+    document.getElementById('headerStatus').innerHTML =
+      '<span style="color:var(--red)">● Could not load providers — refresh the page</span>';
+  }
+}
 
 // ---- Provider + Model ----
 function buildProviderSelect() {
@@ -187,6 +200,12 @@ async function sendMessage() {
 
   const provider = document.getElementById('providerSelect').value;
   const model = document.getElementById('modelSelect').value;
+
+  if (!provider || !model || !PROVIDERS[provider]) {
+    alert('Providers failed to load. Please refresh the page and try again.');
+    return;
+  }
+
   const apiKey = localStorage.getItem(`key_${provider}`);
   if (!apiKey) { openSettings(); return; }
 

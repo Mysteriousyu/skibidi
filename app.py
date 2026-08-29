@@ -10,7 +10,18 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+@app.after_request
+def add_no_cache_headers(response):
+    # Prevent browsers/CDNs from serving stale HTML/JS/CSS after a deploy,
+    # which previously caused old cached JS to talk to a newer backend.
+    if request.path == '/' or request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
 
 ALLOWED_EXTENSIONS = {'png','jpg','jpeg','gif','webp','bmp','svg','mp4','webm','mov','avi',
                       'pdf','txt','py','js','json','csv','md','html','css','zip','tar','gz'}
@@ -112,12 +123,20 @@ def chat():
     model = data.get('model')
     messages = data.get('messages', [])
 
-    if not provider or not api_key or not model:
-        return jsonify({"error": "Missing provider, api_key, or model"}), 400
+    if not provider:
+        return jsonify({"error": "No provider selected. Please refresh the page and pick a provider."}), 400
+    if not api_key:
+        return jsonify({"error": "No API key set for this provider. Open API Keys and add one."}), 400
 
     config = PROVIDERS.get(provider)
     if not config:
-        return jsonify({"error": f"Unknown provider: {provider}"}), 400
+        return jsonify({"error": f"Unknown provider: {provider}. Please refresh the page."}), 400
+
+    if not model:
+        model = config['models'][0]
+
+    if not messages:
+        return jsonify({"error": "No message to send"}), 400
 
     ctx = ssl.create_default_context()
 
