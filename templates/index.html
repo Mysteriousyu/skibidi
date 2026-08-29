@@ -10,11 +10,10 @@
 </head>
 <body>
 <div id="app">
-  <!-- Sidebar -->
   <aside id="sidebar">
     <div class="sidebar-header">
       <div class="logo">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span>OmniLLM</span>
       </div>
       <button class="icon-btn" onclick="newChat()" title="New chat">
@@ -24,7 +23,7 @@
     <div class="sidebar-chats" id="chatList"></div>
     <div class="sidebar-footer">
       <button class="sidebar-btn" onclick="openSettings()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         API Keys
       </button>
       <button class="sidebar-btn" onclick="openTerminal()">
@@ -34,15 +33,13 @@
     </div>
   </aside>
 
-  <!-- Main Chat -->
   <main id="main">
     <header id="chatHeader">
       <button class="icon-btn mobile-menu" onclick="toggleSidebar()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <div class="model-selector">
+      <div class="provider-selector">
         <select id="providerSelect" onchange="onProviderChange()"></select>
-        <select id="modelSelect"></select>
       </div>
       <div class="header-status" id="headerStatus"></div>
     </header>
@@ -53,21 +50,14 @@
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8" stroke-linecap="round"/></svg>
         </div>
         <h2>OmniLLM</h2>
-        <p>One interface, seven providers. Set your API keys and start chatting.</p>
+        <p>One interface, seven AI providers. Add your API key and start chatting.</p>
         <div class="welcome-grid">
-          <div class="welcome-card" onclick="openSettings()">
-            <span class="wc-icon">🔑</span>
-            <span>Set up API keys</span>
-          </div>
-          <div class="welcome-card" onclick="openTerminal()">
-            <span class="wc-icon">⌨️</span>
-            <span>Code terminal</span>
-          </div>
+          <div class="welcome-card" onclick="openSettings()"><span class="wc-icon">🔑</span><span>Set up API keys</span></div>
+          <div class="welcome-card" onclick="openTerminal()"><span class="wc-icon">⌨️</span><span>Code terminal</span></div>
         </div>
       </div>
     </div>
 
-    <!-- File preview bar -->
     <div id="filePreviewBar" class="file-preview-bar hidden"></div>
 
     <div class="input-area">
@@ -114,35 +104,29 @@
       <div class="terminal-editor">
         <div class="terminal-toolbar">
           <span class="terminal-label">editor</span>
-          <button class="btn-run" onclick="runCode()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Run
-          </button>
+          <button class="btn-run" onclick="runCode()">▶ Run</button>
         </div>
-        <textarea id="codeEditor" spellcheck="false" placeholder="# Write Python code here...
-# Example: use your API key with the requests library
+        <textarea id="codeEditor" spellcheck="false">import requests, json
 
-import requests
-import json
+# Paste your API key here
+API_KEY = "your-api-key-here"
 
-API_KEY = 'your-api-key-here'
-MODEL = 'claude-sonnet-4-20250514'  # Change model here
+# ---- ChatGPT ----
+# response = requests.post("https://api.openai.com/v1/chat/completions",
+#     headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+#     json={"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello!"}], "max_tokens": 1024})
 
-response = requests.post(
-    'https://api.anthropic.com/v1/messages',
-    headers={
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-    },
-    json={
-        'model': MODEL,
-        'max_tokens': 1024,
-        'messages': [{'role': 'user', 'content': 'Hello!'}]
-    }
-)
+# ---- Claude ----
+response = requests.post("https://api.anthropic.com/v1/messages",
+    headers={"x-api-key": API_KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
+    json={"model": "claude-sonnet-4-20250514", "max_tokens": 1024,
+          "messages": [{"role": "user", "content": "Hello!"}]})
 
-print(json.dumps(response.json(), indent=2))"></textarea>
+# ---- Gemini ----
+# response = requests.get(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}",
+#     json={"contents": [{"parts": [{"text": "Hello!"}]}]})
+
+print(json.dumps(response.json(), indent=2))</textarea>
       </div>
       <div class="terminal-output">
         <div class="terminal-toolbar">

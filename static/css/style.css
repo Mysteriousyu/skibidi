@@ -134,8 +134,8 @@ body {
   border-bottom: 1px solid var(--border);
   background: var(--bg-raised);
 }
-.model-selector { display:flex; gap:8px; }
-.model-selector select {
+.provider-selector { display:flex; gap:8px; }
+.provider-selector select {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
@@ -146,7 +146,14 @@ body {
   cursor: pointer;
   outline: none;
 }
-.model-selector select:focus { border-color: var(--accent); }
+.provider-selector select:focus { border-color: var(--accent); }
+.key-model {
+  float: right;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
 .header-status {
   margin-left: auto;
   font-size: 12px;

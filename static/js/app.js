@@ -3,110 +3,90 @@ let chats = JSON.parse(localStorage.getItem('omnillm_chats') || '[]');
 let currentChatId = null;
 let pendingFiles = [];
 let isStreaming = false;
-
-const PROVIDERS = {};
+let PROVIDERS = {};
 
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
-  const res = await fetch('/api/providers');
-  Object.assign(PROVIDERS, await res.json());
+  try {
+    const res = await fetch('/api/providers');
+    PROVIDERS = await res.json();
+  } catch(e) {
+    console.error('Failed to load providers', e);
+  }
   buildProviderSelect();
   renderChatList();
-  if (chats.length) {
-    loadChat(chats[0].id);
-  }
+  if (chats.length) loadChat(chats[0].id);
 });
 
-// ---- Providers / Models ----
+// ---- Provider Select (no model choice) ----
 function buildProviderSelect() {
   const sel = document.getElementById('providerSelect');
   sel.innerHTML = '';
   for (const [key, p] of Object.entries(PROVIDERS)) {
     const opt = document.createElement('option');
     opt.value = key;
-    opt.textContent = p.name;
-    // Mark if key is set
     const hasKey = !!localStorage.getItem(`key_${key}`);
-    if (hasKey) opt.textContent += ' ✓';
+    opt.textContent = p.name + (hasKey ? ' ✓' : '');
     sel.appendChild(opt);
   }
-  // Default to first provider with a key, or first overall
   const withKey = Object.keys(PROVIDERS).find(k => localStorage.getItem(`key_${k}`));
   if (withKey) sel.value = withKey;
   onProviderChange();
 }
 
 function onProviderChange() {
-  const provider = document.getElementById('providerSelect').value;
-  const config = PROVIDERS[provider];
-  const mSel = document.getElementById('modelSelect');
-  mSel.innerHTML = '';
-  for (const m of config.models) {
-    const opt = document.createElement('option');
-    opt.value = m;
-    opt.textContent = m;
-    mSel.appendChild(opt);
-  }
   updateStatus();
 }
 
 function updateStatus() {
   const provider = document.getElementById('providerSelect').value;
   const hasKey = !!localStorage.getItem(`key_${provider}`);
+  const config = PROVIDERS[provider];
   const el = document.getElementById('headerStatus');
-  el.innerHTML = hasKey
-    ? '<span style="color:var(--green)">● Connected</span>'
-    : '<span style="color:var(--text-muted)">● No API key</span>';
+  if (hasKey && config) {
+    el.innerHTML = `<span style="color:var(--green)">● ${config.default_model}</span>`;
+  } else {
+    el.innerHTML = `<span style="color:var(--text-muted)">● No API key — <a href="#" onclick="openSettings();return false" style="color:var(--accent)">add one</a></span>`;
+  }
 }
 
 // ---- Chat Management ----
 function newChat() {
-  const chat = {
-    id: crypto.randomUUID(),
-    title: 'New chat',
-    messages: [],
-    created: Date.now()
-  };
+  const chat = { id: crypto.randomUUID(), title: 'New chat', messages: [], created: Date.now() };
   chats.unshift(chat);
   saveChats();
   loadChat(chat.id);
   renderChatList();
+  document.getElementById('messageInput').focus();
 }
 
 function loadChat(id) {
   currentChatId = id;
-  const chat = chats.find(c => c.id === id);
-  if (!chat) return;
   renderChatList();
-  renderMessages(chat.messages);
+  const chat = chats.find(c => c.id === id);
+  if (chat) renderMessages(chat.messages);
 }
 
 function deleteChat(id, e) {
   e.stopPropagation();
   chats = chats.filter(c => c.id !== id);
   saveChats();
-  if (currentChatId === id) {
-    currentChatId = null;
-    document.getElementById('chatMessages').innerHTML =
-      document.getElementById('welcomeScreen') ? '' : '';
-    showWelcome();
-  }
+  if (currentChatId === id) { currentChatId = null; showWelcome(); }
   renderChatList();
 }
 
 function saveChats() {
-  localStorage.setItem('omnillm_chats', JSON.stringify(chats));
+  try { localStorage.setItem('omnillm_chats', JSON.stringify(chats)); } catch(e) {}
 }
 
 function showWelcome() {
-  const el = document.getElementById('chatMessages');
-  el.innerHTML = `
+  document.getElementById('chatMessages').innerHTML = `
     <div class="welcome">
       <div class="welcome-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8" stroke-linecap="round"/></svg>
       </div>
       <h2>OmniLLM</h2>
-      <p>One interface, seven providers. Set your API keys and start chatting.</p>
+      <p>One interface, seven AI providers. Add your API key and start chatting.</p>
       <div class="welcome-grid">
         <div class="welcome-card" onclick="openSettings()"><span class="wc-icon">🔑</span><span>Set up API keys</span></div>
         <div class="welcome-card" onclick="openTerminal()"><span class="wc-icon">⌨️</span><span>Code terminal</span></div>
@@ -115,63 +95,53 @@ function showWelcome() {
 }
 
 function renderChatList() {
-  const el = document.getElementById('chatList');
-  el.innerHTML = chats.map(c => `
+  document.getElementById('chatList').innerHTML = chats.map(c => `
     <div class="chat-item ${c.id === currentChatId ? 'active' : ''}" onclick="loadChat('${c.id}')">
-      <span>${escapeHtml(c.title)}</span>
+      <span>${esc(c.title)}</span>
       <button class="delete-chat" onclick="deleteChat('${c.id}', event)">×</button>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-// ---- Message Rendering ----
+// ---- Messages ----
 function renderMessages(messages) {
   const el = document.getElementById('chatMessages');
   if (!messages.length) { showWelcome(); return; }
-  el.innerHTML = messages.map(m => renderMessage(m)).join('');
+  el.innerHTML = messages.map(renderMsg).join('');
   el.scrollTop = el.scrollHeight;
 }
 
-function renderMessage(msg) {
+function renderMsg(msg) {
   const isUser = msg.role === 'user';
-  const avatar = isUser ? 'Y' : 'AI';
-  const name = isUser ? 'You' : (msg.model || 'Assistant');
   let filesHtml = '';
   if (msg.files && msg.files.length) {
     filesHtml = '<div class="msg-files">' + msg.files.map(f => {
-      if (f.type === 'image') return `<img class="msg-file-thumb" src="${f.preview || f.path}" alt="${escapeHtml(f.name)}">`;
+      if (f.type === 'image') return `<img class="msg-file-thumb" src="${f.preview || f.path}" alt="${esc(f.name)}">`;
       if (f.type === 'video') return `<video class="msg-video" controls src="${f.path}"></video>`;
-      return `<div class="msg-file-card">📎 ${escapeHtml(f.name)}</div>`;
+      return `<div class="msg-file-card">📎 ${esc(f.name)}</div>`;
     }).join('') + '</div>';
   }
-  const content = isUser ? escapeHtml(msg.content) : formatMarkdown(msg.content);
   return `
     <div class="msg ${msg.role}">
-      <div class="msg-avatar">${avatar}</div>
+      <div class="msg-avatar">${isUser ? 'Y' : 'AI'}</div>
       <div class="msg-body">
-        <div class="msg-name">${escapeHtml(name)}</div>
+        <div class="msg-name">${esc(isUser ? 'You' : (msg.model || 'Assistant'))}</div>
         ${filesHtml}
-        <div class="msg-content">${content}</div>
+        <div class="msg-content">${isUser ? esc(msg.content) : fmtMd(msg.content)}</div>
       </div>
     </div>`;
 }
 
-function formatMarkdown(text) {
-  if (!text) return '';
-  // Code blocks
-  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-  // Inline code
-  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // Bold
-  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  // Italic
-  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  // Line breaks to paragraphs
-  text = text.split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
-  return text;
+function fmtMd(t) {
+  if (!t) return '';
+  t = t.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+  t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  t = t.split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+  return t;
 }
 
-function escapeHtml(s) {
+function esc(s) {
   if (!s) return '';
   const d = document.createElement('div');
   d.textContent = s;
@@ -180,9 +150,8 @@ function escapeHtml(s) {
 
 // ---- File Handling ----
 function handleFiles(fileList) {
-  for (const file of fileList) {
-    uploadFile(file);
-  }
+  for (const f of fileList) uploadFile(f);
+  document.getElementById('fileInput').value = '';
 }
 
 async function uploadFile(file) {
@@ -194,9 +163,7 @@ async function uploadFile(file) {
     if (data.error) { alert(data.error); return; }
     pendingFiles.push(data);
     renderFilePreview();
-  } catch(e) {
-    alert('Upload failed: ' + e.message);
-  }
+  } catch(e) { alert('Upload failed: ' + e.message); }
 }
 
 function renderFilePreview() {
@@ -206,10 +173,9 @@ function renderFilePreview() {
   bar.innerHTML = pendingFiles.map((f, i) => `
     <div class="file-chip">
       ${f.type === 'image' ? `<img src="${f.preview}" alt="">` : '📎'}
-      <span>${escapeHtml(f.name)}</span>
+      <span>${esc(f.name)}</span>
       <button class="remove-file" onclick="removePendingFile(${i})">×</button>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 function removePendingFile(i) {
@@ -217,40 +183,25 @@ function removePendingFile(i) {
   renderFilePreview();
 }
 
-// ---- Sending Messages ----
+// ---- Send Message ----
 async function sendMessage() {
   const input = document.getElementById('messageInput');
   const text = input.value.trim();
-  if (!text && !pendingFiles.length) return;
-  if (isStreaming) return;
+  if ((!text && !pendingFiles.length) || isStreaming) return;
 
   const provider = document.getElementById('providerSelect').value;
-  const model = document.getElementById('modelSelect').value;
   const apiKey = localStorage.getItem(`key_${provider}`);
+  if (!apiKey) { openSettings(); return; }
 
-  if (!apiKey) {
-    openSettings();
-    return;
-  }
-
-  // Create chat if needed
   if (!currentChatId) newChat();
   const chat = chats.find(c => c.id === currentChatId);
 
-  // Build user message
-  const userMsg = {
-    role: 'user',
-    content: text,
-    files: [...pendingFiles]
-  };
+  const userMsg = { role: 'user', content: text, files: [...pendingFiles] };
   chat.messages.push(userMsg);
-
-  // Update title from first message
   if (chat.messages.filter(m => m.role === 'user').length === 1) {
     chat.title = text.slice(0, 40) || 'File chat';
   }
 
-  // Clear input
   input.value = '';
   input.style.height = 'auto';
   pendingFiles = [];
@@ -259,74 +210,56 @@ async function sendMessage() {
   saveChats();
   renderChatList();
 
-  // Show typing
+  // Typing indicator
   const chatEl = document.getElementById('chatMessages');
-  const typingDiv = document.createElement('div');
-  typingDiv.className = 'msg assistant';
-  typingDiv.innerHTML = `
+  const typing = document.createElement('div');
+  typing.className = 'msg assistant';
+  typing.id = 'typingIndicator';
+  const config = PROVIDERS[provider];
+  typing.innerHTML = `
     <div class="msg-avatar">AI</div>
     <div class="msg-body">
-      <div class="msg-name">${escapeHtml(model)}</div>
+      <div class="msg-name">${esc(config?.name || provider)}</div>
       <div class="msg-content"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>
     </div>`;
-  chatEl.appendChild(typingDiv);
+  chatEl.appendChild(typing);
   chatEl.scrollTop = chatEl.scrollHeight;
 
   isStreaming = true;
   document.getElementById('sendBtn').disabled = true;
 
-  // Build API messages (excluding files for the API payload)
-  const apiMessages = chat.messages
-    .filter(m => m.role !== 'system')
-    .map(m => ({ role: m.role, content: m.content }));
+  // Build clean message array for API
+  const apiMsgs = chat.messages.map(m => ({ role: m.role, content: m.content || '' }));
 
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, api_key: apiKey, model, messages: apiMessages })
+      body: JSON.stringify({ provider, api_key: apiKey, messages: apiMsgs })
     });
     const data = await res.json();
-
-    typingDiv.remove();
+    typing.remove();
 
     if (data.error) {
-      const errMsg = { role: 'assistant', content: `⚠️ Error: ${data.error}`, model };
-      chat.messages.push(errMsg);
+      chat.messages.push({ role: 'assistant', content: '⚠️ ' + data.error, model: config?.name });
     } else {
-      const assistantMsg = { role: 'assistant', content: data.content, model: data.model || model };
-      chat.messages.push(assistantMsg);
+      chat.messages.push({ role: 'assistant', content: data.content, model: data.model || config?.default_model });
     }
-
-    saveChats();
-    renderMessages(chat.messages);
   } catch(e) {
-    typingDiv.remove();
-    const errMsg = { role: 'assistant', content: `⚠️ Network error: ${e.message}`, model };
-    chat.messages.push(errMsg);
-    saveChats();
-    renderMessages(chat.messages);
+    typing.remove();
+    chat.messages.push({ role: 'assistant', content: '⚠️ Network error: ' + e.message, model: config?.name });
   } finally {
     isStreaming = false;
     document.getElementById('sendBtn').disabled = false;
+    saveChats();
+    renderMessages(chat.messages);
   }
 }
 
-// ---- Input Handling ----
+// ---- Input ----
 function handleInputKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-  // Tab in code editor
-  if (e.target.id === 'codeEditor' && e.key === 'Tab') {
-    e.preventDefault();
-    const s = e.target.selectionStart;
-    e.target.value = e.target.value.substring(0, s) + '    ' + e.target.value.substring(e.target.selectionEnd);
-    e.target.selectionStart = e.target.selectionEnd = s + 4;
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 }
-
 function autoResize(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 160) + 'px';
@@ -337,20 +270,15 @@ function openSettings() {
   const body = document.getElementById('settingsBody');
   body.innerHTML = Object.entries(PROVIDERS).map(([key, p]) => {
     const val = localStorage.getItem(`key_${key}`) || '';
-    const hasKey = !!val;
     return `
       <div class="key-group">
-        <label><span class="key-status ${hasKey ? 'set' : 'unset'}"></span>${p.name}</label>
-        <input type="password" id="keyInput_${key}" value="${val}" placeholder="Enter ${p.name} API key">
+        <label><span class="key-status ${val ? 'set' : 'unset'}"></span>${p.name}<span class="key-model">${p.default_model}</span></label>
+        <input type="password" id="keyInput_${key}" value="${val}" placeholder="Paste your ${p.name} API key">
       </div>`;
   }).join('');
   document.getElementById('settingsModal').classList.remove('hidden');
 }
-
-function closeSettings() {
-  document.getElementById('settingsModal').classList.add('hidden');
-}
-
+function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
 function saveKeys() {
   for (const key of Object.keys(PROVIDERS)) {
     const val = document.getElementById(`keyInput_${key}`).value.trim();
@@ -362,20 +290,13 @@ function saveKeys() {
 }
 
 // ---- Terminal ----
-function openTerminal() {
-  document.getElementById('terminalModal').classList.remove('hidden');
-}
-
-function closeTerminal() {
-  document.getElementById('terminalModal').classList.add('hidden');
-}
-
+function openTerminal() { document.getElementById('terminalModal').classList.remove('hidden'); }
+function closeTerminal() { document.getElementById('terminalModal').classList.add('hidden'); }
 async function runCode() {
   const code = document.getElementById('codeEditor').value;
   const output = document.getElementById('codeOutput');
   output.textContent = 'Running...';
   output.className = '';
-
   try {
     const res = await fetch('/api/execute', {
       method: 'POST',
@@ -390,13 +311,11 @@ async function runCode() {
     output.className = 'output-error';
   }
 }
-
 function clearOutput() {
-  document.getElementById('codeOutput').textContent = 'Ready to run...';
-  document.getElementById('codeOutput').className = '';
+  const o = document.getElementById('codeOutput');
+  o.textContent = 'Ready to run...';
+  o.className = '';
 }
 
-// ---- Sidebar Toggle ----
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-}
+// ---- Sidebar ----
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
