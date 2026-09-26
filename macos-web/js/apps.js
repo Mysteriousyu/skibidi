@@ -204,13 +204,22 @@
   const HB_SDK = 'https://cdn.jsdelivr.net/npm/@hyperbeam/web@0.0.38/dist/index.js';
   const CLOUD = {
     status: null,
+    // mode: 'cloud' (API ready), 'basic' (no API on this host), or 'error' (API exists but failed; retried next time)
     check() {
-      if (!this.status) {
-        this.status = location.protocol.startsWith('http')
-          ? fetch('api/browser', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : { available: false })).catch(() => ({ available: false }))
-          : Promise.resolve({ available: false });
-      }
-      return this.status;
+      if (this.status) return this.status;
+      if (!location.protocol.startsWith('http')) return (this.status = Promise.resolve({ mode: 'basic' }));
+      const p = fetch('api/browser', { cache: 'no-store' })
+        .then(async (r) => {
+          if (r.status === 404) return { mode: 'basic' };
+          if (!r.ok) throw new Error(`The browser service returned ${r.status}.`);
+          const d = await r.json();
+          return { mode: d.available ? 'cloud' : 'basic', needsCode: d.needsCode };
+        })
+        .catch((e) => ({ mode: 'error', error: e instanceof TypeError ? 'The browser service could not be reached. Check your internet connection and try again.' : e.message }));
+      this.status = p;
+      // Only a definite answer is remembered; errors are retried on the next navigation.
+      p.then((st) => { if (st.mode === 'error') this.status = null; });
+      return p;
     },
     code: () => store.get('browserCode', ''),
     headers() { const c = this.code(); return { 'Content-Type': 'application/json', ...(c ? { 'X-Access-Code': c } : {}) }; },
@@ -288,7 +297,7 @@
           const fail = (msg, u) => {
             showOverlay(`<div class="cloud-card"><b>Couldn’t start the cloud browser</b><p>${esc(msg)}</p>
               <div class="cloud-actions"><button type="button" data-x="basic">Use basic mode</button><button type="button" class="primary" data-x="retry">Try again</button></div></div>`);
-            overlay.querySelector('[data-x=retry]').addEventListener('click', () => { starting = null; startCloud(u); });
+            overlay.querySelector('[data-x=retry]').addEventListener('click', () => { starting = null; showOverlay(''); go(u); });
             overlay.querySelector('[data-x=basic]').addEventListener('click', () => { cloudOn = false; urlIcon.innerHTML = UI.search; cloudView.hidden = true; showOverlay(''); showFrame(u); });
           };
 
@@ -320,6 +329,12 @@
                 onConnectionStateChange: (e) => {
                   if (e.state === 'reconnecting') showOverlay('<div class="cloud-card"><div class="spinner"></div><p>Reconnecting…</p></div>');
                   else if (e.state === 'playing') showOverlay('');
+                  else if (e.state === 'failed') {
+                    try { hb?.destroy(); } catch { /* already gone */ }
+                    CLOUD.end(session?.session_id);
+                    hb = null; session = null; starting = null;
+                    fail('The connection to the cloud browser failed. Check your internet connection or any ad blocker, then try again.', current || u);
+                  }
                 },
                 onCloseWarning: (e) => OS().notify({ app: 'safari', title: 'Browser session ending soon', body: e.type === 'inactive' ? 'Your cloud browser will close in a minute because it has been idle.' : 'Your cloud browser has reached its time limit and will close in a minute.' }),
                 onDisconnect: (e) => {
@@ -360,7 +375,8 @@
           const go = async (u) => {
             if (!u) return showStart();
             const st = await CLOUD.check();
-            if (!st.available) return showFrame(u);
+            if (st.mode === 'error') { start.hidden = true; cloudView.hidden = false; setAddress(u); current = u; return fail(st.error, u); }
+            if (st.mode !== 'cloud') return showFrame(u);
             cloudOn = true; urlIcon.innerHTML = UI.cloud;
             start.hidden = true; frame.hidden = true; note.hidden = true; cloudView.hidden = false;
             current = u; setAddress(u);
@@ -374,7 +390,7 @@
             let u;
             if (/^https?:\/\//i.test(text)) u = text;
             else if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(text)) u = 'https://' + text;
-            else u = st.available ? 'https://www.google.com/search?q=' + encodeURIComponent(text) : 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(text);
+            else u = st.mode !== 'basic' ? 'https://www.google.com/search?q=' + encodeURIComponent(text) : 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(text);
             go(u);
           };
 
@@ -382,7 +398,7 @@
             e.preventDefault();
             const f = FAVS[+a.dataset.i];
             const st = await CLOUD.check();
-            go(st.available ? f.url : (f.frameUrl || f.url));
+            go(st.mode !== 'basic' ? f.url : (f.frameUrl || f.url));
           }));
           input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { navigate(input.value); input.blur(); } });
           input.addEventListener('focus', () => input.select());
@@ -403,7 +419,7 @@
           win.data.focusUrl = () => input.focus();
 
           CLOUD.check().then((st) => {
-            body.querySelector('.cloud-hint').textContent = st.available
+            body.querySelector('.cloud-hint').textContent = st.mode !== 'basic'
               ? 'Safari runs a real Chrome browser in the cloud, so every website works. Sessions close automatically when idle.'
               : 'Basic mode: some websites refuse to load inside this page. Deploy with a Hyperbeam API key to enable the full cloud browser.';
           });

@@ -26,7 +26,7 @@ module.exports = async (req, res) => {
   const key = process.env.HYPERBEAM_API_KEY;
   const code = process.env.BROWSER_ACCESS_CODE;
 
-  if (req.method === 'GET') {
+  if (req.method === 'GET' && !(req.query && req.query.diagnose)) {
     return res.status(200).json({ available: Boolean(key), needsCode: Boolean(code) });
   }
   if (!key) {
@@ -34,6 +34,28 @@ module.exports = async (req, res) => {
   }
   if (code && req.headers['x-access-code'] !== code) {
     return res.status(401).json({ error: 'Access code required.', needsCode: true });
+  }
+
+  // GET ?diagnose=1 checks the key, active sessions and usage without starting a session.
+  if (req.method === 'GET') {
+    const auth = { headers: { Authorization: `Bearer ${key}` } };
+    const read = async (url) => {
+      try {
+        const r = await fetch(url, auth);
+        const text = await r.text();
+        let body; try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
+        return { status: r.status, body };
+      } catch (e) {
+        return { status: 0, body: String(e && e.message) };
+      }
+    };
+    const [sessions, usage] = await Promise.all([read(API), read(`${API}/usage`)]);
+    return res.status(200).json({
+      keyAccepted: sessions.status === 200,
+      activeSessions: Array.isArray(sessions.body && sessions.body.results) ? sessions.body.results.length : null,
+      sessionsResponse: sessions.status === 200 ? undefined : sessions,
+      usage: usage.status === 200 ? usage.body.usage : usage,
+    });
   }
 
   if (req.method === 'POST') {
@@ -59,6 +81,7 @@ module.exports = async (req, res) => {
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
+        console.error('Hyperbeam start failed', r.status, JSON.stringify(data));
         return res.status(502).json({ error: data.message || data.error || `Hyperbeam returned status ${r.status}.` });
       }
       return res.status(200).json({
@@ -67,7 +90,8 @@ module.exports = async (req, res) => {
         admin_token: data.admin_token,
         max_minutes: minutes,
       });
-    } catch {
+    } catch (e) {
+      console.error('Hyperbeam unreachable', e);
       return res.status(502).json({ error: 'Could not reach Hyperbeam. Try again in a moment.' });
     }
   }
