@@ -189,26 +189,48 @@
      ================================================================= */
   const APPLE_GLYPH = '<svg viewBox="0 0 170 170" width="30" height="30"><path fill="#fff" d="M150.4 130.3c-2.3 5.3-5 10.2-8.2 14.7-4.3 6.1-7.8 10.4-10.5 12.7-4.2 3.9-8.8 5.9-13.6 6-3.5 0-7.7-1-12.6-3-4.9-2-9.4-3-13.5-3-4.3 0-8.9 1-13.8 3-4.9 2-8.9 3.1-11.9 3.2-4.6.2-9.3-1.8-13.9-6.1-3-2.6-6.7-7-11.2-13.3-4.8-6.7-8.7-14.5-11.8-23.4-3.3-9.6-4.9-18.9-4.9-27.9 0-10.3 2.2-19.2 6.7-26.7 3.5-6 8.2-10.7 14-14.2 5.9-3.5 12.2-5.3 19-5.4 3.7 0 8.6 1.2 14.7 3.4 6.1 2.3 10 3.4 11.7 3.4 1.3 0 5.6-1.3 12.9-4 6.9-2.5 12.7-3.5 17.5-3.1 12.9 1 22.6 6.1 29 15.3-11.6 7-17.3 16.8-17.2 29.4.1 9.8 3.7 18 10.6 24.5 3.1 3 6.6 5.2 10.5 6.8-.8 2.4-1.7 4.7-2.6 6.9zM119.1 7.2c0 7.7-2.8 14.9-8.4 21.5-6.7 7.9-14.9 12.5-23.7 11.8-.1-.9-.2-1.9-.2-2.9 0-7.4 3.2-15.3 8.9-21.8 2.8-3.3 6.4-6 10.8-8.1 4.4-2.1 8.5-3.3 12.4-3.5.1 1 .2 2 .2 3z"/></svg>';
   const FAVS = [
+    { name: 'Google', url: 'https://www.google.com', c: '#4285f4', l: 'G' },
     { name: 'Apple', url: 'https://www.apple.com', c: '#1d1d1f', l: '' },
+    { name: 'YouTube', url: 'https://www.youtube.com', c: '#ff0033', l: '▶' },
     { name: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Golden_Gate_Bridge', c: '#6b6b70', l: 'W' },
-    { name: 'OpenStreetMap', url: 'https://www.openstreetmap.org/export/embed.html?bbox=-122.52,37.79,-122.45,37.84&layer=mapnik', c: '#7ebc6f', l: 'M' },
-    { name: 'Example', url: 'https://example.com', c: '#0a84ff', l: 'E' },
+    { name: 'Maps', url: 'https://www.openstreetmap.org/#map=14/37.8199/-122.4783', frameUrl: 'https://www.openstreetmap.org/export/embed.html?bbox=-122.52,37.79,-122.45,37.84&layer=mapnik', c: '#7ebc6f', l: 'M' },
     { name: 'GitHub', url: 'https://github.com', c: '#24292f', l: 'G' },
     { name: 'MDN', url: 'https://developer.mozilla.org', c: '#1b1b1b', l: 'M' },
-    { name: 'YouTube', url: 'https://www.youtube.com', c: '#ff0033', l: '▶' },
     { name: 'News', url: 'https://news.ycombinator.com', c: '#ff6600', l: 'Y' },
   ];
+
+  /* Cloud browser: a real Chromium streamed from Hyperbeam through /api/browser.
+     Falls back to an iframe when the API isn't deployed or isn't configured. */
+  const HB_SDK = 'https://cdn.jsdelivr.net/npm/@hyperbeam/web@0.0.38/dist/index.js';
+  const CLOUD = {
+    status: null,
+    check() {
+      if (!this.status) {
+        this.status = location.protocol.startsWith('http')
+          ? fetch('api/browser', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : { available: false })).catch(() => ({ available: false }))
+          : Promise.resolve({ available: false });
+      }
+      return this.status;
+    },
+    code: () => store.get('browserCode', ''),
+    headers() { const c = this.code(); return { 'Content-Type': 'application/json', ...(c ? { 'X-Access-Code': c } : {}) }; },
+    end(id) {
+      if (!id) return;
+      fetch('api/browser?id=' + encodeURIComponent(id), { method: 'DELETE', headers: this.headers(), keepalive: true }).catch(() => {});
+    },
+  };
+
   register({
     id: 'safari', name: 'Safari', icon: AI.safari, category: 'Productivity',
     open(url) {
       return WM.createWindow({
-        app: 'safari', title: 'Start Page', width: 980, height: 620, minWidth: 480,
+        app: 'safari', title: 'Start Page', width: 1000, height: 640, minWidth: 480,
         render(body, win) {
           win.titlebar.querySelector('.title').remove();
           win.titlebar.insertAdjacentHTML('beforeend', `
             <button class="tb-btn" data-a="sb" aria-label="Sidebar">${UI.sidebar}</button>
             <div class="tb-group"><button class="tb-btn" data-a="back" aria-label="Back">${UI.back}</button><button class="tb-btn" data-a="fwd" aria-label="Forward">${UI.fwd}</button></div>
-            <label class="url-field">${UI.search}<input id="safari-url-${win.id}" placeholder="Search or enter website name" aria-label="Address" spellcheck="false"></label>
+            <label class="url-field"><span class="url-icon">${UI.search}</span><input id="safari-url-${win.id}" placeholder="Search or enter website name" aria-label="Address" spellcheck="false"></label>
             <button class="tb-btn" data-a="reload" aria-label="Reload">${UI.reload}</button>
             <button class="tb-btn" data-a="share" aria-label="Share">${UI.share}</button>
             <button class="tb-btn" data-a="home" aria-label="Start page">${UI.tabs}</button>`);
@@ -218,46 +240,175 @@
               <div class="favs">${FAVS.map((f, i) => `<a class="fav" href="${f.url}" data-i="${i}"><div class="tile" style="background:${f.c}">${f.l || APPLE_GLYPH}</div>${f.name}</a>`).join('')}</div>
               <h3>Privacy Report</h3>
               <div class="privacy">In the last seven days, Safari has prevented <b>47 trackers</b> from profiling you and hidden your IP address from known trackers.</div>
+              <p class="cloud-hint"></p>
             </div>
             <iframe hidden title="Web page" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
             <div class="blocked-note" hidden>Page not showing? Many sites refuse to load inside another page. <a target="_blank" rel="noopener">Open in a new tab ↗</a></div>
+            <div class="cloud-view" hidden><div class="cloud-screen"></div></div>
+            <div class="cloud-overlay" hidden></div>
           </div>`;
           const input = win.titlebar.querySelector('input');
+          const urlIcon = win.titlebar.querySelector('.url-icon');
           const frame = body.querySelector('iframe'), start = body.querySelector('.start-page'), note = body.querySelector('.blocked-note');
+          const cloudView = body.querySelector('.cloud-view'), screen = body.querySelector('.cloud-screen'), overlay = body.querySelector('.cloud-overlay');
           const hist = [], fwd = [];
-          let current = null;
-          const show = (u, push = true) => {
+          let current = null, cloudOn = false, hb = null, session = null, starting = null, pending = null, closed = false;
+
+          const setAddress = (u) => {
+            input.value = u ? u.replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
+            try { win.setTitle(u ? new URL(u).hostname.replace(/^www\./, '') : 'Start Page'); } catch { win.setTitle(u || 'Start Page'); }
+          };
+          const showOverlay = (html) => { overlay.innerHTML = html; overlay.hidden = !html; };
+          const showStart = () => {
+            start.hidden = false; frame.hidden = true; frame.src = 'about:blank'; note.hidden = true; cloudView.hidden = true; showOverlay('');
+            current = null; setAddress('');
+          };
+
+          /* ---- iframe mode ---- */
+          const showFrame = (u, push = true) => {
             if (push && current !== undefined) { hist.push(current); fwd.length = 0; }
             current = u;
-            if (!u) { frame.hidden = true; frame.src = 'about:blank'; start.hidden = false; note.hidden = true; input.value = ''; win.setTitle('Start Page'); return; }
+            if (!u) return showStart();
             start.hidden = true; frame.hidden = false; frame.src = u; note.hidden = false;
             note.querySelector('a').href = u;
-            input.value = u.replace(/^https?:\/\//, '').replace(/\/$/, '');
-            win.setTitle(new URL(u).hostname.replace(/^www\./, ''));
+            setAddress(u);
           };
-          const navigate = (text) => {
+
+          /* ---- cloud mode ---- */
+          const askCode = (msg) => new Promise((resolve) => {
+            showOverlay(`<form class="cloud-card"><b>Cloud browser locked</b><p>${esc(msg)}</p>
+              <input id="safari-code-${win.id}" type="password" placeholder="Access code" aria-label="Access code" autocomplete="off">
+              <div class="cloud-actions"><button type="button" data-x="cancel">Use basic mode</button><button type="submit" class="primary">Unlock</button></div></form>`);
+            const form = overlay.querySelector('form');
+            form.querySelector('input').focus();
+            form.addEventListener('submit', (e) => { e.preventDefault(); store.set('browserCode', form.querySelector('input').value.trim()); resolve(true); });
+            form.querySelector('[data-x=cancel]').addEventListener('click', () => resolve(false));
+          });
+
+          const fail = (msg, u) => {
+            showOverlay(`<div class="cloud-card"><b>Couldn’t start the cloud browser</b><p>${esc(msg)}</p>
+              <div class="cloud-actions"><button type="button" data-x="basic">Use basic mode</button><button type="button" class="primary" data-x="retry">Try again</button></div></div>`);
+            overlay.querySelector('[data-x=retry]').addEventListener('click', () => { starting = null; startCloud(u); });
+            overlay.querySelector('[data-x=basic]').addEventListener('click', () => { cloudOn = false; urlIcon.innerHTML = UI.search; cloudView.hidden = true; showOverlay(''); showFrame(u); });
+          };
+
+          const startCloud = (u) => starting || (starting = (async () => {
+            start.hidden = true; cloudView.hidden = false; setAddress(u);
+            showOverlay('<div class="cloud-card"><div class="spinner"></div><p>Starting a secure cloud browser…</p></div>');
+            try {
+              let r, data;
+              for (;;) {
+                r = await fetch('api/browser', {
+                  method: 'POST', headers: CLOUD.headers(),
+                  body: JSON.stringify({ url: u, dark: OS().isDark(), width: screen.clientWidth, height: screen.clientHeight }),
+                });
+                data = await r.json().catch(() => ({}));
+                if (r.status === 401 && data.needsCode) {
+                  if (!(await askCode(CLOUD.code() ? 'That code didn’t work. Try again.' : 'Enter the access code to use the cloud browser.'))) { fail('No access code entered.', u); starting = null; return; }
+                  showOverlay('<div class="cloud-card"><div class="spinner"></div><p>Starting a secure cloud browser…</p></div>');
+                  continue;
+                }
+                break;
+              }
+              if (!r.ok) throw new Error(data.error || `The server returned ${r.status}.`);
+              if (closed) { CLOUD.end(data.session_id); return; }
+              session = data;
+              const { default: Hyperbeam } = await import(HB_SDK);
+              hb = await Hyperbeam(screen, data.embed_url, {
+                adminToken: data.admin_token,
+                volume: (OS().settings.volume ?? 60) / 100,
+                onConnectionStateChange: (e) => {
+                  if (e.state === 'reconnecting') showOverlay('<div class="cloud-card"><div class="spinner"></div><p>Reconnecting…</p></div>');
+                  else if (e.state === 'playing') showOverlay('');
+                },
+                onCloseWarning: (e) => OS().notify({ app: 'safari', title: 'Browser session ending soon', body: e.type === 'inactive' ? 'Your cloud browser will close in a minute because it has been idle.' : 'Your cloud browser has reached its time limit and will close in a minute.' }),
+                onDisconnect: (e) => {
+                  if (closed || e.type === 'request') return;
+                  hb = null; session = null; starting = null;
+                  showOverlay(`<div class="cloud-card"><b>Session ended</b><p>${e.type === 'inactive' ? 'The cloud browser closed after being idle.' : e.type === 'absolute' ? 'The cloud browser reached its time limit.' : 'The connection to the cloud browser was lost.'}</p>
+                    <div class="cloud-actions"><button type="button" class="primary" data-x="new">Start a new session</button></div></div>`);
+                  overlay.querySelector('[data-x=new]').addEventListener('click', () => startCloud(current || 'https://www.google.com'));
+                },
+              });
+              hb.tabs.onUpdated.addListener((tabId, info, tab) => {
+                if (tab && tab.active === false) return;
+                const u2 = info.url || tab?.url;
+                if (u2 && !u2.startsWith('chrome')) { current = u2; setAddress(u2); }
+                if (tab?.title) win.setTitle(tab.title);
+              });
+              showOverlay('');
+              if (pending && pending !== u) { hb.tabs.update({ url: pending }); }
+              pending = null;
+            } catch (err) {
+              starting = null;
+              fail(err.message || 'Something went wrong.', u);
+            }
+          })());
+
+          let resizeTimer;
+          new ResizeObserver(() => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+              if (!hb || cloudView.hidden) return;
+              let w = screen.clientWidth, h = screen.clientHeight;
+              const k = hb.maxArea && w * h > hb.maxArea ? Math.sqrt(hb.maxArea / (w * h)) : 1;
+              w = Math.floor((w * k) / 2) * 2; h = Math.floor((h * k) / 2) * 2;
+              if (w > 200 && h > 150) hb.resize(w, h).catch(() => {});
+            }, 500);
+          }).observe(screen);
+
+          const go = async (u) => {
+            if (!u) return showStart();
+            const st = await CLOUD.check();
+            if (!st.available) return showFrame(u);
+            cloudOn = true; urlIcon.innerHTML = UI.cloud;
+            start.hidden = true; frame.hidden = true; note.hidden = true; cloudView.hidden = false;
+            current = u; setAddress(u);
+            if (hb) { hb.tabs.update({ url: u }); return; }
+            if (starting) { pending = u; return; }
+            startCloud(u);
+          };
+          const navigate = async (text) => {
             text = text.trim(); if (!text) return;
+            const st = await CLOUD.check();
             let u;
             if (/^https?:\/\//i.test(text)) u = text;
-            else if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(text)) u = 'https://' + text;
-            else u = 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(text);
-            show(u);
+            else if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(text)) u = 'https://' + text;
+            else u = st.available ? 'https://www.google.com/search?q=' + encodeURIComponent(text) : 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(text);
+            go(u);
           };
-          body.querySelectorAll('.fav').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); show(FAVS[+a.dataset.i].url); }));
+
+          body.querySelectorAll('.fav').forEach((a) => a.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const f = FAVS[+a.dataset.i];
+            const st = await CLOUD.check();
+            go(st.available ? f.url : (f.frameUrl || f.url));
+          }));
           input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { navigate(input.value); input.blur(); } });
           input.addEventListener('focus', () => input.select());
           const tb = (a, fn) => win.titlebar.querySelector(`[data-a=${a}]`).addEventListener('click', fn);
-          tb('back', () => { if (hist.length) { fwd.push(current); show(hist.pop(), false); } });
-          tb('fwd', () => { if (fwd.length) { hist.push(current); show(fwd.pop(), false); } });
-          tb('reload', () => { if (current) frame.src = current; });
-          tb('home', () => show(null));
+          tb('back', () => { if (cloudOn && hb) return hb.tabs.goBack(); if (hist.length) { fwd.push(current); showFrame(hist.pop(), false); } });
+          tb('fwd', () => { if (cloudOn && hb) return hb.tabs.goForward(); if (fwd.length) { hist.push(current); showFrame(fwd.pop(), false); } });
+          tb('reload', () => { if (cloudOn && hb) return hb.tabs.reload(); if (current) frame.src = current; });
+          tb('home', () => { if (cloudOn && !cloudView.hidden) { cloudView.hidden = true; showOverlay(''); start.hidden = false; setAddress(''); return; } showStart(); });
           tb('sb', () => OS().notify({ app: 'safari', title: 'Reading List', body: 'Your Reading List is empty.' }));
           tb('share', () => {
             if (!current) return;
             navigator.clipboard?.writeText(current).then(() => OS().notify({ app: 'safari', title: 'Link Copied', body: current }), () => {});
           });
+
+          const endSession = () => { closed = true; try { hb?.destroy(); } catch { /* already gone */ } CLOUD.end(session?.session_id); hb = null; session = null; };
+          window.addEventListener('pagehide', endSession);
+          win.onClose = () => { window.removeEventListener('pagehide', endSession); endSession(); };
           win.data.focusUrl = () => input.focus();
-          current = undefined; show(url || null, false);
+
+          CLOUD.check().then((st) => {
+            body.querySelector('.cloud-hint').textContent = st.available
+              ? 'Safari runs a real Chrome browser in the cloud, so every website works. Sessions close automatically when idle.'
+              : 'Basic mode: some websites refuse to load inside this page. Deploy with a Hyperbeam API key to enable the full cloud browser.';
+          });
+          current = undefined;
+          if (!url) showStart(); else if (/^https?:\/\//i.test(url)) go(url); else navigate(url);
         },
       });
     },

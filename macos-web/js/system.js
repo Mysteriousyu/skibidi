@@ -446,7 +446,7 @@
         if (actions.length) groups.push(['Actions', actions.map(([, l, fn]) => ({ icon: AI.settings, label: l, hint: 'Action', go: fn }))]);
         const files = searchFiles(q).slice(0, 6);
         if (files.length) groups.push(['Documents', files.map((f) => ({ icon: f.type === 'dir' ? AI.folder : AI.file, label: f.name, hint: f.path.replace(VFS.HOME, '~').split('/').slice(0, -1).join('/'), go: () => window.openPath(f.path) }))]);
-        groups.push(['Web', [{ icon: AI.safari, label: `Search the web for “${input.value.trim()}”`, hint: 'Safari', go: () => APPS.safari.open('https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(input.value.trim())) }]]);
+        groups.push(['Web', [{ icon: AI.safari, label: `Search the web for “${input.value.trim()}”`, hint: 'Safari', go: () => APPS.safari.open(input.value.trim()) }]]);
         let html = '';
         groups.forEach(([g, items]) => {
           html += `<div class="sp-group">${g}</div>`;

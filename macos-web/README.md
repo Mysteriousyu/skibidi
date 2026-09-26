@@ -50,7 +50,17 @@ js/apps.js          built-in apps
 js/system.js        menu bar, Dock, Control Center, Spotlight, boot and lock
 ```
 
-## Notes
+## Safari's cloud browser
 
-- Safari loads pages in an iframe. Many sites, including apple.com and github.com, block being embedded, so each page also has an "Open in a new tab" link.
+Most big websites refuse to load inside another page, so an iframe can't be a real browser. When the project is deployed with a [Hyperbeam](https://hyperbeam.com) API key, Safari instead streams a real Chrome browser that runs in the cloud, so every site works, including Google, YouTube and logins.
+
+- `api/browser.js` is a Vercel serverless function. It starts and stops Hyperbeam sessions and keeps the API key on the server.
+- Set these in Vercel → Project → Settings → Environment Variables, then redeploy:
+  - `HYPERBEAM_API_KEY` (required)
+  - `BROWSER_ACCESS_CODE` (optional, but recommended). Visitors must enter this code before a session starts, so strangers can't run up your Hyperbeam bill.
+  - `BROWSER_MAX_MINUTES` (optional). Hard limit per session. The default is 30.
+- A session closes when you close the Safari window or leave the page, after 10 idle minutes, or 60 seconds after everyone disconnects.
+- Without the key, for example when you open `index.html` from disk, Safari falls back to basic iframe mode. Each page then gets an "Open in a new tab" link.
+
+## Notes
 - This is a fan-made learning project. It is not affiliated with Apple. Apple and macOS are trademarks of Apple Inc.

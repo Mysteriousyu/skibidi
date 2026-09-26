@@ -540,3 +540,21 @@ input, textarea, select { font: inherit; color: inherit; }
 
 /* Floating panels keep a legibility floor even at the clearest glass setting */
 #notif-center .glass, #toasts .glass, #control-center { --glass-alpha: max(.5, var(--user-glass, .5)); }
+
+/* Safari cloud browser (Hyperbeam) */
+.url-icon { display: flex; }
+.cloud-view { position: absolute; inset: 0; background: #111; }
+.cloud-screen { position: absolute; inset: 0; }
+.cloud-screen video, .cloud-screen canvas { width: 100% !important; height: 100% !important; object-fit: contain; }
+.cloud-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--win-bg) 88%, transparent); z-index: 2; }
+.cloud-card { max-width: 360px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 22px; border-radius: 16px; background: var(--win-bg-2); box-shadow: 0 8px 30px rgba(0,0,0,.12); }
+.cloud-card b { font-size: 15px; }
+.cloud-card p { margin: 0; color: var(--text-2); line-height: 1.45; }
+.cloud-card input { width: 100%; height: 32px; border-radius: 8px; border: 1px solid var(--sep); background: var(--win-bg); padding: 0 10px; outline: 0; }
+.cloud-card input:focus { border-color: var(--accent); }
+.cloud-actions { display: flex; gap: 8px; margin-top: 4px; }
+.cloud-actions button { padding: 6px 14px; border-radius: 8px; background: var(--field-bg); font-weight: 500; }
+.cloud-actions button.primary { background: var(--accent); color: #fff; }
+.spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--sep); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.cloud-hint { margin-top: 18px; max-width: 560px; color: var(--text-3); font-size: 12px; line-height: 1.5; }
