@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>macOS Golden Gate Web</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="os">
+  <!-- Boot -->
+  <div id="boot" class="screen">
+    <svg class="apple-logo" viewBox="0 0 170 170" aria-hidden="true"><path fill="currentColor" d="M150.4 130.3c-2.3 5.3-5 10.2-8.2 14.7-4.3 6.1-7.8 10.4-10.5 12.7-4.2 3.9-8.8 5.9-13.6 6-3.5 0-7.7-1-12.6-3-4.9-2-9.4-3-13.5-3-4.3 0-8.9 1-13.8 3-4.9 2-8.9 3.1-11.9 3.2-4.6.2-9.3-1.8-13.9-6.1-3-2.6-6.7-7-11.2-13.3-4.8-6.7-8.7-14.5-11.8-23.4-3.3-9.6-4.9-18.9-4.9-27.9 0-10.3 2.2-19.2 6.7-26.7 3.5-6 8.2-10.7 14-14.2 5.9-3.5 12.2-5.3 19-5.4 3.7 0 8.6 1.2 14.7 3.4 6.1 2.3 10 3.4 11.7 3.4 1.3 0 5.6-1.3 12.9-4 6.9-2.5 12.7-3.5 17.5-3.1 12.9 1 22.6 6.1 29 15.3-11.6 7-17.3 16.8-17.2 29.4.1 9.8 3.7 18 10.6 24.5 3.1 3 6.6 5.2 10.5 6.8-.8 2.4-1.7 4.7-2.6 6.9zM119.1 7.2c0 7.7-2.8 14.9-8.4 21.5-6.7 7.9-14.9 12.5-23.7 11.8-.1-.9-.2-1.9-.2-2.9 0-7.4 3.2-15.3 8.9-21.8 2.8-3.3 6.4-6 10.8-8.1 4.4-2.1 8.5-3.3 12.4-3.5.1 1 .2 2 .2 3z"/></svg>
+    <div class="boot-bar"><div class="boot-fill"></div></div>
+  </div>
+
+  <!-- Lock screen -->
+  <div id="lock" class="screen" hidden>
+    <div class="lock-clock">
+      <div class="lock-date"></div>
+      <div class="lock-time"></div>
+    </div>
+    <form class="lock-login" autocomplete="off">
+      <div class="avatar">G</div>
+      <div class="lock-name">Guest User</div>
+      <div class="lock-field">
+        <input id="lock-password" type="password" placeholder="Enter Password" aria-label="Password">
+        <button type="submit" aria-label="Log in">→</button>
+      </div>
+      <div class="lock-hint">Any password works · press Return</div>
+    </form>
+  </div>
+
+  <!-- Desktop -->
+  <div id="desktop" class="screen" hidden>
+    <div id="wallpaper"></div>
+    <header id="menubar"></header>
+    <div id="desktop-icons"></div>
+    <div id="windows"></div>
+    <nav id="dock-wrap"><div id="dock"></div></nav>
+    <div id="control-center" class="glass panel" hidden></div>
+    <div id="notif-center" hidden></div>
+    <div id="spotlight" hidden></div>
+    <div id="launchpad" hidden></div>
+    <div id="toasts"></div>
+    <div id="context-menu" class="glass menu" hidden></div>
+    <div id="dropdown" class="glass menu" hidden></div>
+  </div>
+
+  <div id="blackout" hidden></div>
+</div>
+
+<script src="js/icons.js"></script>
+<script src="js/wallpapers.js"></script>
+<script src="js/fs.js"></script>
+<script src="js/wm.js"></script>
+<script src="js/apps.js"></script>
+<script src="js/system.js"></script>
+</body>
+</html>
